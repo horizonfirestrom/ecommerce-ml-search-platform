@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+services:
+  keyword-search: http://keyword-search-service:8081/search
+  vector-search: http://vector-search-service:7001/search
+  nlp: http://nlp-service:7002/embed
+  ltr: http://ltr-service:7003/rerank
+  ab-testing: http://ab-testing-service:7004/assign
