@@ -1,70 +1,70 @@
 package com.imran.search.api.service;
 
-import com.imran.search.api.dto.KeywordSearchResponse;
 import com.imran.search.api.dto.SearchRequest;
 import com.imran.search.api.dto.SearchResponse;
-import com.imran.search.api.dto.SearchResult;
-import com.imran.search.api.dto.VectorSearchResponse;
 import com.imran.search.api.service.clients.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SearchService {
 
+    private final QueryUnderstandingClient queryClient;
     private final NlpClient nlpClient;
     private final VectorSearchClient vectorClient;
-    private final KeywordSearchClient keywordClient;
     private final LtrClient ltrClient;
     private final AbTestingClient abTestingClient;
 
-    // 🔥 MANUAL CONSTRUCTOR (Spring will autowire dependencies here)
+    @Autowired
     public SearchService(
+            QueryUnderstandingClient queryClient,
             NlpClient nlpClient,
             VectorSearchClient vectorClient,
-            KeywordSearchClient keywordClient,
             LtrClient ltrClient,
             AbTestingClient abTestingClient
     ) {
+        this.queryClient = queryClient;
         this.nlpClient = nlpClient;
         this.vectorClient = vectorClient;
-        this.keywordClient = keywordClient;
         this.ltrClient = ltrClient;
         this.abTestingClient = abTestingClient;
     }
 
-    public SearchResponse search(SearchRequest request) {
+    public SearchResponse performSearch(SearchRequest req) {
+        // 1. Clean the query
+        String cleaned = queryClient.cleanQuery(req.getQuery());
 
-        String query = request.getQuery();
+        // 2. Get embedding for the cleaned query
+        List<Float> embedding = nlpClient.getEmbedding(cleaned);
 
-        // 1. Embed query
-        double[] queryEmbedding = nlpClient.embed(query);
+        // 3. Perform vector search with embedding and topK
+        List<String> initialIds = vectorClient.search(embedding, req.getTopK());
 
-        // 2. Vector search
-        List<VectorSearchResponse> vectorResults =
-                vectorClient.search(queryEmbedding, request.getTopK());
+        // 4. Build features for the initial product IDs
+        Map<String, List<Float>> features = ltrClient.buildFeatures(initialIds);
 
-        // 3. Keyword search (BM25)
-        List<KeywordSearchResponse> keywordResults =
-                keywordClient.search(query, request.getTopK());
+        // 5. Rerank results
+        List<String> reranked = ltrClient.rerank(cleaned, initialIds, features);
 
-        // 4. Hybrid Fusion
-        List<SearchResult> combined =
-                HybridRanker.combine(vectorResults, keywordResults);
-
-        // 5. A/B Test bucket assignment
-        String bucket = abTestingClient.assignBucket();
-
-        if ("ltr".equals(bucket)) {
-            combined = ltrClient.reRank(query, combined);
+        // 6. Optional AB-Testing: only if userId provided
+        String variant = null;
+        String userId = req.getUserId();
+        if (userId != null && !userId.isBlank()) {
+            variant = abTestingClient.assignVariant("exp_search_ranking", userId);
+            abTestingClient.logEvent(userId, "exp_search_ranking", variant, "search",
+                    Map.of("query", req.getQuery()));
         }
 
-        // 6. Prepare response
-        SearchResponse response = new SearchResponse();
-        response.setQuery(query);
-        response.setResults(combined);
+        // 7. Prepare and return response
+        SearchResponse resp = new SearchResponse();
+        resp.setOriginalQuery(req.getQuery());
+        resp.setCleanedQuery(cleaned);
+        resp.setVariant(variant);
+        resp.setProductIds(reranked);
 
-        return response;
+        return resp;
     }
 }

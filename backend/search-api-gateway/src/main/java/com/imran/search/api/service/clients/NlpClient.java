@@ -1,29 +1,38 @@
 package com.imran.search.api.service.clients;
 
-import com.imran.search.api.dto.TextDTO;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import com.imran.search.api.config.ServiceEndpoints;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-@Service
+@Component
 public class NlpClient {
 
-    private final WebClient.Builder webClientBuilder;
+    private final WebClient webClient;
+    private final ServiceEndpoints endpoints;
 
-    @Value("${services.nlp}")
-    private String nlpUrl;
-
-    public NlpClient(WebClient.Builder webClientBuilder) {
-        this.webClientBuilder = webClientBuilder;
+    @Autowired
+    public NlpClient(WebClient webClient, ServiceEndpoints endpoints) {
+        this.webClient = webClient;
+        this.endpoints = endpoints;
     }
 
-    public double[] embed(String text) {
-        return webClientBuilder.build()
-                .post()
-                .uri(nlpUrl)
-                .bodyValue(new TextDTO(text))
-                .retrieve()
-                .bodyToMono(double[].class)
-                .block();
+    public List<Float> getEmbedding(String text) {
+        Map<String, String> body = Map.of("text", text);
+        Map<?, ?> resp = webClient.post()
+            .uri(endpoints.getNlpEmbed())
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(Map.class)
+            .block();
+        if (resp == null || !resp.containsKey("embedding")) {
+            throw new RuntimeException("Invalid response from NLP service");
+        }
+        @SuppressWarnings("unchecked")
+        List<Number> list = (List<Number>) resp.get("embedding");
+        return list.stream().map(Number::floatValue).toList();
     }
 }

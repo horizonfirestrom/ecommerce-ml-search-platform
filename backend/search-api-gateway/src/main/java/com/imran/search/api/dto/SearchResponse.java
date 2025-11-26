@@ -3,22 +3,40 @@ package com.imran.search.api.dto;
 import java.util.List;
 
 public class SearchResponse {
+    private String originalQuery;
+    private String cleanedQuery;
+    private String variant;
+    private List<String> productIds;
 
-    private String query;
-    private List<SearchResult> results;
-
-    public String getQuery() {
-        return query;
-    }
-    public void setQuery(String query) {
-        this.query = query;
+    public String getOriginalQuery() {
+        return originalQuery;
     }
 
-    public List<SearchResult> getResults() {
-        return results;
+    public void setOriginalQuery(String originalQuery) {
+        this.originalQuery = originalQuery;
     }
-    public void setResults(List<SearchResult> results) {
-        this.results = results;
+
+    public String getCleanedQuery() {
+        return cleanedQuery;
+    }
+
+    public void setCleanedQuery(String cleanedQuery) {
+        this.cleanedQuery = cleanedQuery;
+    }
+
+    public String getVariant() {
+        return variant;
+    }
+
+    public void setVariant(String variant) {
+        this.variant = variant;
+    }
+
+    public List<String> getProductIds() {
+        return productIds;
+    }
+
+    public void setProductIds(List<String> productIds) {
+        this.productIds = productIds;
     }
 }
-

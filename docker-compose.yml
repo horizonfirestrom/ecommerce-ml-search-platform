@@ -1,137 +1,57 @@
-version: '3.9'
+
 
 services:
-  ###################################################################
-  # 🟦 OPENSEARCH (Keyword Search Engine)
-  ###################################################################
-  opensearch:
-    image: opensearchproject/opensearch:2.15.0
-    container_name: opensearch
-    environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "9200:9200"
-      - "9600:9600"
-    networks:
-      - cvsnet
-
-  ###################################################################
-  # 🟦 OPENSEARCH DASHBOARDS
-  ###################################################################
-  dashboards:
-    image: opensearchproject/opensearch-dashboards:2.15.0
-    container_name: dashboards
-    depends_on:
-      - opensearch
-    ports:
-      - "5601:5601"
-    environment:
-      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
-    networks:
-      - cvsnet
-
-  ###################################################################
-  # 🟧 KAFKA + ZOOKEEPER
-  ###################################################################
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-    networks:
-      - cvsnet
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: kafka
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,OUTSIDE://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,OUTSIDE:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-    networks:
-      - cvsnet
-
-  ###################################################################
-  # 🔵 JAVA BACKEND SERVICES
-  ###################################################################
+  ################################################
+  # 🔵 Search API Gateway (Spring Boot)
+  ################################################
   search-api-gateway:
     build: ./backend/search-api-gateway
     container_name: search-api-gateway
-    environment:
-      - KEYWORD_SEARCH_URL=http://keyword-search-service:8081
-      - VECTOR_SEARCH_URL=http://vector-search-service:7001
-      - NLP_SERVICE_URL=http://nlp-service:7002
-      - LTR_SERVICE_URL=http://ltr-service:7003
-      - AB_TESTING_URL=http://ab-testing-service:7004
-    depends_on:
-      - opensearch
-      - keyword-search-service
-      - vector-search-service
-      - nlp-service
-      - ltr-service
     ports:
       - "8080:8080"
-    networks:
-      - cvsnet
-
-  keyword-search-service:
-    build: ./backend/keyword-search-service
-    container_name: keyword-search-service
-    environment:
-      - OPENSEARCH_HOST=opensearch
-      - OPENSEARCH_PORT=9200
     depends_on:
-      - opensearch
-    ports:
-      - "8081:8081"
+      - query-understanding-service
+      - nlp-embedding-service
+      - vector-search-service
+      - ltr-service
+      - ab-testing-service
     networks:
-      - cvsnet
+      - searchnet
 
-  ###################################################################
-  # 🟪 PYTHON MICROSERVICES
-  ###################################################################
-  vector-search-service:
-    build: ./backend/vector-search-service
-    container_name: vector-search-service
-    environment:
-      - MODEL_PATH=/models/embeddings
-    ports:
-      - "7001:7001"
-    networks:
-      - cvsnet
-
-  nlp-service:
-    build: ./backend/nlp-service
-    container_name: nlp-service
-    environment:
-      - TRANSFORMER_MODEL=sentence-transformers/all-MiniLM-L6-v2
-    ports:
-      - "7002:7002"
-    networks:
-      - cvsnet
-
-  ltr-service:
-    build: ./backend/ltr-ranking-service
-    container_name: ltr-service
-    environment:
-      - LTR_MODEL_PATH=/models/ltr_model.txt
+  ################################################
+  # 🟪 Python microservices
+  ################################################
+  query-understanding-service:
+    build: ./backend/query-understanding-service
+    container_name: query-understanding-service
     ports:
       - "7003:7003"
     networks:
-      - cvsnet
+      - searchnet
+
+  nlp-embedding-service:
+    build: ./backend/nlp-embedding-service
+    container_name: nlp-service
+    ports:
+      - "7002:7002"
+    networks:
+      - searchnet
+
+  vector-search-service:
+    build: ./backend/vector-search-service
+    container_name: vector-search-service
+    ports:
+      - "7001:7001"
+    networks:
+      - searchnet
+
+  ltr-service:
+    build: ./backend/ltr-service
+    container_name: ltr-service
+    ports:
+      - "7005:7005"
+    networks:
+      - searchnet
 
   ab-testing-service:
     build: ./backend/ab-testing-service
@@ -139,51 +59,8 @@ services:
     ports:
       - "7004:7004"
     networks:
-      - cvsnet
+      - searchnet
 
-  ###################################################################
-  # 🔶 AIRFLOW (FEATURE PIPELINES + ML TRAINING AUTOMATION)
-  ###################################################################
-  airflow:
-    image: apache/airflow:2.10.0
-    container_name: airflow
-    environment:
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-    volumes:
-      - ./pipelines/airflow/dags:/opt/airflow/dags
-      - ./pipelines/airflow/plugins:/opt/airflow/plugins
-    ports:
-      - "8088:8080"
-    command: webserver
-    networks:
-      - cvsnet
-
-  ###################################################################
-  # 🔷 SPARK (For feature engineering)
-  ###################################################################
-  spark:
-    build: ./pipelines/spark
-    container_name: spark
-    ports:
-      - "7077:7077"
-      - "8089:8080"
-    networks:
-      - cvsnet
-
-  ###################################################################
-  # 🟩 FRONTEND
-  ###################################################################
-  frontend:
-    build: ./frontend/react-app
-    container_name: react-ui
-    ports:
-      - "3000:3000"
-    networks:
-      - cvsnet
-
-###################################################################
-# NETWORK
-###################################################################
 networks:
-  cvsnet:
+  searchnet:
     driver: bridge
