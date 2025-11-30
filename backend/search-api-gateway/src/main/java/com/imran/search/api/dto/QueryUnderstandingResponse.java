@@ -5,18 +5,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * DTO to map the JSON returned by query-understanding-service /process.
- * The Python service returns fields:
- *   - cleaned_query
- *   - tokens
- * so we use @JsonProperty to bind cleaned_query -> cleanedQuery.
+ *
+ * Expected Python JSON:
+ * {
+ *   "cleaned_query": "red shoes",
+ *   "tokens": ["red", "shoes"]
+ * }
  */
 public class QueryUnderstandingResponse {
 
-    // Map JSON field "cleaned_query" to this Java property
+    // Maps JSON field "cleaned_query" -> Java field cleanedQuery
     @JsonProperty("cleaned_query")
     private String cleanedQuery;
 
-    // Field name "tokens" matches exactly, no annotation needed
+    // JSON field "tokens" matches this name directly
     private List<String> tokens;
 
     // ----- Getters & setters -----
@@ -35,5 +37,13 @@ public class QueryUnderstandingResponse {
 
     public void setTokens(List<String> tokens) {
         this.tokens = tokens;
+    }
+
+    @Override
+    public String toString() {
+        return "QueryUnderstandingResponse{" +
+                "cleanedQuery='" + cleanedQuery + '\'' +
+                ", tokens=" + tokens +
+                '}';
     }
 }

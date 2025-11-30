@@ -5,8 +5,6 @@ import com.imran.search.api.dto.QueryUnderstandingResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.Map;
-
 /**
  * Client that calls the Python query-understanding-service (/process).
  */
@@ -18,7 +16,6 @@ public class QueryUnderstandingClient {
 
     public QueryUnderstandingClient(WebClient.Builder builder,
                                     ServiceEndpoints endpoints) {
-        // We let ServiceEndpoints contain the full URL, so baseUrl can be empty.
         this.webClient = builder.build();
         this.endpoints = endpoints;
     }
@@ -30,22 +27,17 @@ public class QueryUnderstandingClient {
      * @return cleaned query from Python, e.g. "red shoes"
      */
     public String cleanQuery(String query) {
-        // Request body: { "query": "<user query>" }
-        Map<String, String> requestBody = Map.of("query", query);
-
-        QueryUnderstandingResponse resp = webClient
-                .post()
-                .uri(endpoints.getQueryUnderstanding())   // e.g. http://query-understanding-service:7003/process
-                .bodyValue(requestBody)
+        QueryUnderstandingResponse response = webClient.post()
+                .uri(endpoints.getQueryUnderstanding()) // e.g. http://query-understanding-service:7003/process
+                .bodyValue(java.util.Map.of("query", query))
                 .retrieve()
                 .bodyToMono(QueryUnderstandingResponse.class)
                 .block();
 
-        if (resp == null || resp.getCleanedQuery() == null || resp.getCleanedQuery().isBlank()) {
-            // This is exactly where your "Invalid response..." exception came from
-            throw new RuntimeException("Invalid response from query-understanding service");
+        if (response == null || response.getCleanedQuery() == null) {
+            throw new RuntimeException("Invalid response from query-understanding service: " + response);
         }
 
-        return resp.getCleanedQuery();
+        return response.getCleanedQuery();
     }
 }
