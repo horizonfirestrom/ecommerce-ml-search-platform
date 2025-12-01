@@ -44,7 +44,7 @@ public class SearchService {
         List<String> initialIds = vectorClient.search(embedding, req.getTopK());
 
         // 4. Build features for the initial product IDs
-        Map<String, List<Float>> features = ((Object) ltrClient).buildFeatures(initialIds);
+        Map<String, List<Float>> features = ltrClient.buildFeatures(initialIds);
 
         // 5. Rerank results
         List<String> reranked = ltrClient.rerank(cleaned, initialIds, features);
